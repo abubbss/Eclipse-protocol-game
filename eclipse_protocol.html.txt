@@ -1,0 +1,515 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Eclipse Protocol — Web Prototype</title>
+<style>
+  :root{
+    --bg:#070814; --panel:#0f1220; --muted:#9aa0b2; --accent:#f2c94c; --danger:#e46b6b;
+    --good:#6fe0a6; --blue:#8fb9ff;
+  }
+  html,body{height:100%;margin:0;background:linear-gradient(180deg,#02020a 0%, #051029 100%); color:#e6eef9; font-family:system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial;}
+  #gameWrap{display:flex;flex-direction:column;height:100%;width:100%;}
+  #topBar{padding:10px 12px;background:rgba(0,0,0,0.15);display:flex;align-items:center;gap:12px;}
+  #title{font-weight:700;color:var(--accent);} #infoBar{margin-left:auto;color:var(--muted);font-size:14px;}
+  #main{display:flex;flex:1;gap:10px;padding:10px;}
+  #leftPanel{flex:1;background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));border-radius:8px;padding:10px;display:flex;flex-direction:column;align-items:center;}
+  #canvas{background:#06060b;border-radius:6px;touch-action:none;}
+  #controls{display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap;justify-content:center;}
+  button.icon{background:var(--panel);border:1px solid rgba(255,255,255,0.04);color:var(--muted);padding:8px 10px;border-radius:8px;font-weight:600;}
+  button.primary{background:var(--accent);color:#08101a;border:none;}
+  #rightPanel{width:320px;min-width:240px;background:rgba(0,0,0,0.12);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:8px;}
+  .stat{display:flex;justify-content:space-between;align-items:center;padding:6px 8px;background:rgba(255,255,255,0.02);border-radius:6px;}
+  .bar{height:10px;background:rgba(255,255,255,0.04);border-radius:6px;overflow:hidden;}
+  .bar > i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),#f58c2a);}
+  .log{flex:1;background:rgba(255,255,255,0.02);padding:8px;border-radius:6px;overflow:auto;font-size:13px;color:var(--muted);}
+  .dpad{width:140px;height:140px;background:rgba(255,255,255,0.02);border-radius:12px;display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:10px;}
+  .dpad button{font-size:18px;border-radius:8px;padding:8px;border:none;background:rgba(255,255,255,0.02);color:var(--muted);}
+  .choices{display:flex;gap:6px;flex-wrap:wrap;}
+  .choice{padding:8px;border-radius:8px;background:rgba(255,255,255,0.02);color:var(--muted);border:1px solid rgba(255,255,255,0.02);flex:1;text-align:center;}
+  @media (max-width:800px){
+    #main{flex-direction:column;padding:6px;}
+    #rightPanel{width:100%;min-width:0;}
+    .dpad{width:120px;height:120px;}
+  }
+</style>
+</head>
+<body>
+<div id="gameWrap">
+  <div id="topBar">
+    <div id="title">Eclipse Protocol</div>
+    <div id="subtitle">— Umbra Array, Sector Recon</div>
+    <div id="infoBar">Tip: Rotate to landscape for best experience</div>
+  </div>
+
+  <div id="main">
+    <div id="leftPanel">
+      <canvas id="canvas" width="660" height="660"></canvas>
+      <div id="controls">
+        <button class="icon" id="btnDeploy">Deploy Probe</button>
+        <button class="icon" id="btnRecall" disabled>Recall Probe</button>
+        <button class="icon" id="btnNext">Next Day</button>
+        <button class="icon" id="btnSector">Next Sector</button>
+      </div>
+
+      <div style="margin-top:8px;display:flex;gap:8px;align-items:center;">
+        <div class="dpad" id="dpad">
+          <div></div><button data-dir="up">▲</button><div></div>
+          <button data-dir="left">◀</button><div></div><button data-dir="right">▶</button>
+          <div></div><button data-dir="down">▼</button><div></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <button class="icon" id="assign1">Assign 1→Eng</button>
+          <button class="icon" id="assign2">Assign 2→Res</button>
+          <button class="icon" id="assign3">Assign 3→Pil</button>
+          <button class="icon" id="assign4">Assign 4→Rec</button>
+        </div>
+      </div>
+
+    </div>
+
+    <div id="rightPanel">
+      <div class="stat"><div><strong>Day</strong></div><div id="day">0</div></div>
+      <div class="stat"><div><strong>Eclipse</strong></div><div id="eclipse">0/100</div></div>
+      <div class="stat"><div>Energy</div><div id="energy">100</div></div>
+      <div class="stat"><div>Hull</div><div id="hull">100</div></div>
+      <div class="stat"><div>Supplies</div><div id="supplies">100</div></div>
+      <div class="stat"><div>Research</div><div id="research">0</div></div>
+
+      <div style="margin-top:6px"><strong>Crew</strong></div>
+      <div class="stat"><div>1. Rhea (Cmdr) S9</div><div id="st1">St5</div></div>
+      <div class="stat"><div>2. Imani (Sci) S8</div><div id="st2">St3</div></div>
+      <div class="stat"><div>3. Arjun (Eng) S7</div><div id="st3">St4</div></div>
+      <div class="stat"><div>4. Mira (Pilot) S6</div><div id="st4">St6</div></div>
+
+      <div style="margin-top:6px"><strong>Recent Log</strong></div>
+      <div class="log" id="log"></div>
+
+      <div style="margin-top:6px"><strong>Encounter</strong></div>
+      <div id="encounterBox" class="choices"><div class="choice" id="encText">None</div></div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+/* Eclipse Protocol — Web Prototype
+   Single-file JS game. Mobile-friendly controls.
+   Controls:
+     - Touch D-pad or arrow keys to move probe (when deployed).
+     - Deploy / Recall buttons.
+     - Next Day advances time (affects eclipse).
+     - Assign crew buttons toggle assignment (simple).
+*/
+
+(function(){
+  // Config
+  const SECTOR_SIZE = 11;
+  const TILE = 44; // pixel tile size (canvas scaled)
+  const CANVAS_PIX = SECTOR_SIZE * TILE;
+  const PROBE_OXY_MAX = 100;
+  const ECLIPSE_MAX = 100;
+
+  // State
+  let sectors = [];
+  let currentSector = null;
+  let currentSectorIndex = 0;
+
+  let ship = {
+    day: 0, eclipse: 0,
+    resources: { energy:100, hull:100, supplies:100, research:0 },
+    crew: [
+      {name:"Commander Rhea", role:"Commander", skill:9, stress:5},
+      {name:"Dr. Imani Cho", role:"Scientist", skill:8, stress:3},
+      {name:"Lt. Arjun K.", role:"Engineer", skill:7, stress:4},
+      {name:"Ensign Mira", role:"Pilot", skill:6, stress:6},
+    ],
+    stations: { engineering:null, research:null, piloting:null, recon:null },
+    allies:0, enemies:0,
+    flags: { probe_deployed:false },
+    probe: null,
+    log: []
+  };
+
+  // helpers
+  function seedRandom(s){
+    // simple LCG
+    let x = (s * 9301 + 49297) % 233280;
+    return function(){ x = (x*9301 + 49297) % 233280; return x/233280; };
+  }
+
+  function genSector(seed){
+    const rnd = seedRandom(seed||Math.floor(Math.random()*999999));
+    const grid = [];
+    for(let y=0;y<SECTOR_SIZE;y++){
+      grid[y]=[];
+      for(let x=0;x<SECTOR_SIZE;x++) grid[y][x]=0;
+    }
+    // place hazards
+    for(let i=0;i<SECTOR_SIZE*2;i++){
+      let x=Math.floor(rnd()*SECTOR_SIZE), y=Math.floor(rnd()*SECTOR_SIZE);
+      grid[y][x]=1;
+    }
+    for(let i=0;i<3;i++){
+      let x=Math.floor(rnd()*SECTOR_SIZE), y=Math.floor(rnd()*SECTOR_SIZE);
+      grid[y][x]=2;
+    }
+    if(rnd() < 0.6){
+      let x=Math.floor(rnd()*SECTOR_SIZE), y=Math.floor(rnd()*SECTOR_SIZE);
+      grid[y][x]=3;
+    }
+    for(let i=0;i<SECTOR_SIZE;i++){
+      let x=Math.floor(rnd()*SECTOR_SIZE), y=Math.floor(rnd()*SECTOR_SIZE);
+      if(grid[y][x]===0) grid[y][x]=4;
+    }
+    const discovered = Array.from({length:SECTOR_SIZE},()=>Array(SECTOR_SIZE).fill(false));
+    return {seed: seed||Math.floor(Math.random()*999999), grid, discovered, start:[Math.floor(SECTOR_SIZE/2),Math.floor(SECTOR_SIZE/2)]};
+  }
+
+  function newProbe(sector){
+    return {x: sector.start[0], y: sector.start[1], oxy:PROBE_OXY_MAX, alive:true};
+  }
+
+  // UI refs
+  const canvas = document.getElementById('canvas');
+  canvas.width = CANVAS_PIX; canvas.height = CANVAS_PIX;
+  const ctx = canvas.getContext('2d');
+  const dayEl = document.getElementById('day');
+  const eclipseEl = document.getElementById('eclipse');
+  const energyEl = document.getElementById('energy');
+  const hullEl = document.getElementById('hull');
+  const suppliesEl = document.getElementById('supplies');
+  const researchEl = document.getElementById('research');
+  const logEl = document.getElementById('log');
+  const encText = document.getElementById('encText');
+  const btnDeploy = document.getElementById('btnDeploy');
+  const btnRecall = document.getElementById('btnRecall');
+  const btnNext = document.getElementById('btnNext');
+  const btnSector = document.getElementById('btnSector');
+  const assignBtns = [document.getElementById('assign1'),document.getElementById('assign2'),document.getElementById('assign3'),document.getElementById('assign4')];
+
+  // initialize sectors
+  for(let i=0;i<6;i++) sectors.push(genSector(Math.floor(Math.random()*999999)));
+  currentSector = sectors[0];
+
+  // initial discover center
+  currentSector.discovered[currentSector.start[1]][currentSector.start[0]] = true;
+
+  // drawing
+  function draw(){
+    // clear
+    ctx.fillStyle = "#05060b";
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+
+    // draw tiles
+    for(let y=0;y<SECTOR_SIZE;y++){
+      for(let x=0;x<SECTOR_SIZE;x++){
+        let tile = currentSector.grid[y][x];
+        let discovered = currentSector.discovered[y][x];
+        let px = x*TILE, py = y*TILE;
+        if(!discovered){
+          ctx.fillStyle = "#050814";
+          ctx.fillRect(px,py,TILE-2,TILE-2);
+          continue;
+        }
+        switch(tile){
+          case 0: ctx.fillStyle="#1b2130"; break;
+          case 1: ctx.fillStyle="#5b1515"; break;
+          case 2: ctx.fillStyle="#51286a"; break;
+          case 3: ctx.fillStyle="#1b5f35"; break;
+          case 4: ctx.fillStyle="#3a3a3a"; break;
+        }
+        ctx.fillRect(px,py,TILE-2,TILE-2);
+      }
+    }
+
+    // draw probe
+    if(ship.flags.probe_deployed && ship.probe){
+      ctx.fillStyle = "#ffdf6b";
+      ctx.beginPath();
+      const cx = ship.probe.x*TILE + TILE/2, cy = ship.probe.y*TILE + TILE/2;
+      ctx.arc(cx,cy,TILE/3,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle="#05060b";
+      ctx.font = (TILE/3)+"px sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle";
+      ctx.fillText("P",cx,cy);
+    }
+
+    // HUD overlays (tiny)
+    ctx.fillStyle = "#ffffffaa";
+    ctx.font = "14px sans-serif";
+    ctx.textAlign = "left"; ctx.textBaseline="top";
+    ctx.fillText("Sector #" + currentSector.seed, 8, 8);
+    ctx.fillText("Probe O₂: " + (ship.probe? Math.max(0,ship.probe.oxy) : "-"), 8, 26);
+  }
+
+  // update UI
+  function updateUI(){
+    dayEl.textContent = ship.day;
+    eclipseEl.textContent = ship.eclipse + "/" + ECLIPSE_MAX;
+    energyEl.textContent = Math.round(ship.resources.energy);
+    hullEl.textContent = Math.round(ship.resources.hull);
+    suppliesEl.textContent = Math.round(ship.resources.supplies);
+    researchEl.textContent = Math.round(ship.resources.research);
+    document.getElementById('st1').textContent = "St" + ship.crew[0].stress;
+    document.getElementById('st2').textContent = "St" + ship.crew[1].stress;
+    document.getElementById('st3').textContent = "St" + ship.crew[2].stress;
+    document.getElementById('st4').textContent = "St" + ship.crew[3].stress;
+    // log
+    logEl.innerHTML = ship.log.slice(-8).reverse().map(s=>"<div>"+s+"</div>").join("");
+    // encounter text
+    if(encounterActive){
+      encText.textContent = encounterActive.text;
+      encText.style.background = "rgba(255,255,255,0.03)";
+    } else {
+      encText.textContent = "None";
+      encText.style.background = "transparent";
+    }
+    // buttons
+    btnDeploy.disabled = ship.flags.probe_deployed;
+    btnRecall.disabled = !ship.flags.probe_deployed;
+  }
+
+  // interactions
+  function revealNeighbors(x,y){
+    // reveal tile and immediate neighbors
+    for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){
+      let nx=x+dx, ny=y+dy;
+      if(nx>=0 && nx<SECTOR_SIZE && ny>=0 && ny<SECTOR_SIZE){
+        currentSector.discovered[ny][nx]=true;
+      }
+    }
+  }
+
+  function deployProbe(){
+    if(ship.flags.probe_deployed) return;
+    if(ship.resources.energy<8 || ship.resources.supplies<5){
+      ship.log.push("Not enough energy/supplies to deploy probe.");
+      return;
+    }
+    ship.probe = newProbe(currentSector);
+    ship.flags.probe_deployed = true;
+    ship.resources.energy -= 8; ship.resources.supplies -= 5;
+    currentSector.discovered[ship.probe.y][ship.probe.x] = true;
+    revealNeighbors(ship.probe.x, ship.probe.y);
+    ship.log.push("Probe deployed.");
+  }
+
+  function recallProbe(){
+    if(!ship.flags.probe_deployed) return;
+    if(ship.probe && ship.probe.alive){
+      ship.resources.energy = Math.min(300, ship.resources.energy + 10);
+      ship.log.push("Probe recalled successfully; recovered 10 energy.");
+    } else {
+      ship.resources.supplies = Math.max(0, ship.resources.supplies - 2);
+      ship.log.push("Probe lost during mission.");
+    }
+    ship.probe = null; ship.flags.probe_deployed = false;
+  }
+
+  function moveProbe(dx,dy){
+    if(!ship.flags.probe_deployed || !ship.probe || !ship.probe.alive) return;
+    const nx = ship.probe.x + dx, ny = ship.probe.y + dy;
+    if(nx<0||nx>=SECTOR_SIZE||ny<0||ny>=SECTOR_SIZE) return;
+    if(currentSector.grid[ny][nx]===4) {
+      ship.log.push("Blocked tile.");
+      return;
+    }
+    ship.probe.x = nx; ship.probe.y = ny;
+    currentSector.discovered[ny][nx]=true;
+    revealNeighbors(nx,ny);
+    ship.probe.oxy -= 1;
+    if(ship.probe.oxy<=0){ ship.probe.alive=false; ship.log.push("Probe oxygen depleted."); }
+    // tile interactions
+    const tile = currentSector.grid[ny][nx];
+    if(tile===1 && Math.random()<0.2){ let dmg = Math.floor(Math.random()*9)+4; ship.resources.hull = Math.max(0, ship.resources.hull - dmg); ship.log.push("Probe triggered hazard: hull lost "+dmg+"."); ship.crew.forEach(c=>c.stress+=1); }
+    else if(tile===2){ let gain = Math.floor(Math.random()*8)+5; ship.resources.energy = Math.min(300,ship.resources.energy+gain); ship.log.push("Probe recovered artifact: energy +"+gain+"."); currentSector.grid[ny][nx]=0; }
+    else if(tile===3 && Math.random()<0.6){ triggerDiplomacy(); currentSector.grid[ny][nx]=0; }
+  }
+
+  function nextDayTick(){
+    ship.day += 1;
+    let progress = 2 + Math.floor(ship.day/5);
+    ship.eclipse = Math.min(ECLIPSE_MAX, ship.eclipse + progress);
+    ship.resources.supplies = Math.max(0, ship.resources.supplies - 6);
+    let stress_inc = 1 + Math.floor(ship.eclipse/30);
+    if(ship.resources.supplies < 30) stress_inc += 1;
+    ship.crew.forEach(c=> c.stress = Math.min(100, c.stress + stress_inc));
+    // recon skill lowers bad event chance
+    let recon_skill = 0;
+    if(ship.stations.recon!=null) recon_skill = ship.crew[ship.stations.recon].skill;
+    if(Math.random() < 0.12 + (0.06*(1 - recon_skill/10))){
+      let ev = randomEvent();
+      ship.log.push(ev);
+    }
+    if(ship.eclipse>40) ship.resources.hull = Math.max(0, ship.resources.hull - 1);
+    // passive research
+    if(ship.stations.research!=null) ship.resources.research += ship.crew[ship.stations.research].skill * 0.02;
+  }
+
+  function randomEvent(){
+    const r = Math.random();
+    if(r < 0.25){ ship.allies += 1; return "A mobile enclave sent a cautious signal; potential ally found."; }
+    else if(r < 0.55){ let loss = Math.floor(Math.random()*11)+5; ship.resources.energy = Math.max(0,ship.resources.energy - loss); return "Microflare drained "+loss+" energy."; }
+    else { let gain = Math.floor(Math.random()*8)+5; ship.resources.research += gain; return "Sensor resonance yields "+gain+" research points."; }
+  }
+
+  // diplomacy mini encounter
+  let encounterActive = null;
+  function triggerDiplomacy(){
+    encounterActive = { text: "A mobile enclave hails you. Offer aid / Fortify / Harvest?", choices:["Offer aid","Fortify","Harvest"] };
+    renderEncounterOptions();
+  }
+
+  function renderEncounterOptions(){
+    const box = document.getElementById('encounterBox');
+    box.innerHTML = '';
+    if(!encounterActive) return;
+    const msg = document.createElement('div'); msg.className='choice'; msg.style.flex='1 1 100%'; msg.textContent = encounterActive.text; box.appendChild(msg);
+    encounterActive.choices.forEach((c,i)=>{
+      const b = document.createElement('div'); b.className='choice'; b.textContent = c; b.onclick = ()=>resolveEncounter(i);
+      box.appendChild(b);
+    });
+  }
+
+  function resolveEncounter(choiceIndex){
+    if(!encounterActive) return;
+    const researchIdx = ship.stations.research; const researchSkill = (researchIdx!=null)? ship.crew[researchIdx].skill : 3;
+    const engIdx = ship.stations.engineering; const engSkill = (engIdx!=null)? ship.crew[engIdx].skill : 3;
+    const roll = Math.random() + (researchSkill/20) + (engSkill/30);
+    if(choiceIndex===0){
+      if(roll>0.7){ ship.allies+=1; ship.resources.supplies += 15; ship.log.push("Enclave joined and shared supplies."); }
+      else { ship.enemies+=1; ship.resources.energy -= 10; ship.log.push("Offer rejected; envoy warned others."); }
+    } else if(choiceIndex===1){
+      if(roll>0.5){ ship.resources.hull += 6; ship.log.push("Traded blueprints: hull repair improved."); }
+      else ship.log.push("Enclave declined to interfere.");
+    } else {
+      if(roll>0.8){ ship.resources.energy += 25; ship.log.push("Harvest succeeded: +25 energy."); }
+      else { ship.enemies+=1; ship.resources.hull -= 8; ship.log.push("Raid backfired; retaliation."); }
+    }
+    encounterActive = null; renderEncounterOptions();
+  }
+
+  // endings
+  function evaluateEnding(){
+    if(ship.eclipse >= ECLIPSE_MAX) return "ECLIPSE_COMPLETE";
+    if(ship.day > 30 && ship.resources.supplies < 20 && ship.resources.energy < 20) return "ABANDON";
+    if(ship.allies >= 3 && ship.resources.research > 20) return "JOIN_ARCHITECTS";
+    if(ship.resources.energy > 160 && ship.resources.hull > 80) return "SEIZE_CONTROL";
+    return null;
+  }
+
+  function showEnding(key){
+    // simple modal-like overlay using canvas
+    draw(); updateUI();
+    ctx.fillStyle = "rgba(0,0,0,0.7)"; ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.fillStyle = "#fff"; ctx.font = "26px sans-serif"; ctx.textAlign="center";
+    let text="";
+    if(key==="ECLIPSE_COMPLETE") text="The Umbra Array completes its eclipse. Darkness falls.";
+    else if(key==="ABANDON") text="You abandon the system with survivors — hard but necessary.";
+    else if(key==="JOIN_ARCHITECTS") text="You join the Architects — a transcendence begins.";
+    else if(key==="SEIZE_CONTROL") text="You seize the Array and repurpose it. Power consolidates.";
+    else text="Unknown fate.";
+    ctx.fillText("ENDING", canvas.width/2, canvas.height/2 - 40);
+    ctx.font = "18px sans-serif"; ctx.fillText(text, canvas.width/2, canvas.height/2);
+    ship.log.push("GAME END: " + text);
+    updateUI();
+    // disable controls
+    btnDeploy.disabled = true; btnRecall.disabled = true; btnNext.disabled = true; btnSector.disabled = true;
+  }
+
+  // input handlers
+  document.addEventListener('keydown', e=>{
+    if(e.key==="ArrowUp") moveProbe(0,-1);
+    else if(e.key==="ArrowDown") moveProbe(0,1);
+    else if(e.key==="ArrowLeft") moveProbe(-1,0);
+    else if(e.key==="ArrowRight") moveProbe(1,0);
+    updateLoop();
+  });
+
+  document.getElementById('dpad').addEventListener('click', e=>{
+    const dir = e.target.dataset.dir;
+    if(!dir) return;
+    if(dir==='up') moveProbe(0,-1);
+    if(dir==='down') moveProbe(0,1);
+    if(dir==='left') moveProbe(-1,0);
+    if(dir==='right') moveProbe(1,0);
+    updateLoop();
+  });
+
+  btnDeploy.addEventListener('click', ()=>{ deployProbe(); updateLoop(); });
+  btnRecall.addEventListener('click', ()=>{ recallProbe(); updateLoop(); });
+  btnNext.addEventListener('click', ()=>{ nextDayTick(); updateLoop(); });
+  btnSector.addEventListener('click', ()=>{ currentSectorIndex = (currentSectorIndex+1)%sectors.length; currentSector = sectors[currentSectorIndex]; ship.log.push("Moved to sector " + currentSector.seed); if(!currentSector.discovered[currentSector.start[1]][currentSector.start[0]]) currentSector.discovered[currentSector.start[1]][currentSector.start[0]]=true; updateLoop(); });
+
+  assignBtns.forEach((b,idx)=>{
+    b.addEventListener('click', ()=>{
+      const stations = ["engineering","research","piloting","recon"];
+      // toggle assign: if assigned already, unassign; else assign this crew to station
+      const st = stations[idx];
+      // if this crew already assigned somewhere, remove it
+      const pre = ship.stations[st];
+      if(pre === idx){ ship.stations[st] = null; ship.log.push("Unassigned crew " + (idx+1) + " from " + st); }
+      else {
+        // remove crew from any station
+        for(let k in ship.stations){ if(ship.stations[k]===idx) ship.stations[k]=null; }
+        ship.stations[st] = idx; ship.log.push("Assigned crew " + (idx+1) + " to " + st);
+      }
+      updateLoop();
+    });
+  });
+
+  // main update loop
+  function updateLoop(){
+    // clamp resources
+    ship.resources.energy = Math.max(0,Math.min(300,ship.resources.energy));
+    ship.resources.hull = Math.max(0,Math.min(100,ship.resources.hull));
+    ship.resources.supplies = Math.max(0,Math.min(200,ship.resources.supplies));
+    // evaluate probe interactions if tile already discovered (the probe's move handler did interactions)
+    draw(); updateUI();
+    const end = evaluateEnding();
+    if(end) showEnding(end);
+  }
+
+  // initial UI & draw
+  ship.log.push("Welcome, Commander. The Umbra Array looms.");
+  updateLoop();
+
+  // scale canvas for mobile retina if needed
+  function scaleCanvas(){
+    const dpr = window.devicePixelRatio || 1;
+    canvas.style.width = Math.min(window.innerWidth-60, 660) + "px";
+    canvas.style.height = canvas.style.width;
+  }
+  window.addEventListener('resize', ()=>{ scaleCanvas(); updateLoop(); });
+  scaleCanvas();
+
+  // touch swipe support for probe movement
+  let touchStart = null;
+  canvas.addEventListener('touchstart', e=>{
+    if(!e.touches || e.touches.length==0) return;
+    const t = e.touches[0];
+    touchStart = {x:t.clientX, y:t.clientY, time: Date.now()};
+  });
+  canvas.addEventListener('touchend', e=>{
+    if(!touchStart) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - touchStart.x, dy = t.clientY - touchStart.y;
+    if(Math.abs(dx) < 10 && Math.abs(dy) < 10){
+      // tap: try to deploy/recall if near buttons? (skip)
+    } else {
+      if(Math.abs(dx) > Math.abs(dy)){
+        if(dx>0) moveProbe(1,0); else moveProbe(-1,0);
+      } else {
+        if(dy>0) moveProbe(0,1); else moveProbe(0,-1);
+      }
+      updateLoop();
+    }
+    touchStart = null;
+  });
+
+  // done
+})();
+</script>
+</body>
+</html>
